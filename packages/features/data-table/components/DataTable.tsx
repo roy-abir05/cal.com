@@ -4,7 +4,6 @@ import type { Row } from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
 import type { Table as ReactTableType, Header, HeaderGroup } from "@tanstack/react-table";
 import { useVirtualizer, type Virtualizer, type VirtualItem } from "@tanstack/react-virtual";
-// eslint-disable-next-line no-restricted-imports
 import kebabCase from "lodash/kebabCase";
 import { useEffect, useState, memo, useMemo } from "react";
 
@@ -37,7 +36,7 @@ export type DataTablePropsFromWrapper<TData> = {
   className?: string;
   containerClassName?: string;
   headerClassName?: string;
-  rowClassName?: string;
+  rowClassName?: string | ((row: Row<TData>) => string);
   paginationMode?: "infinite" | "standard";
   hasWrapperContext?: boolean;
 };
@@ -240,7 +239,7 @@ type DataTableBodyProps<TData> = {
   isPending?: boolean;
   onRowMouseclick?: (row: Row<TData>) => void;
   paginationMode?: "infinite" | "standard";
-  rowClassName?: string;
+  rowClassName?: string | ((row: Row<TData>) => string);
 };
 
 type RowToRender<TData> = {
@@ -291,45 +290,56 @@ function DataTableBody<TData>({
       className="border-subtle relative grid border-t"
       data-testid={testId}
       style={{ height: tableHeight }}>
-      {rowsToRender.map(({ row, virtualItem }) => (
-        <TableRow
-          ref={virtualItem ? (node) => rowVirtualizer.measureElement(node) : undefined}
-          key={row.id}
-          data-index={virtualItem?.index} //needed for dynamic row height measurement
-          data-state={row.getIsSelected() && "selected"}
-          onClick={() => onRowMouseclick && onRowMouseclick(row)}
-          style={{
-            display: "flex",
-            ...(virtualItem && {
-              position: "absolute",
-              transform: `translateY(${virtualItem.start}px)`,
-              width: "100%",
-            }),
-          }}
-          className={classNames(onRowMouseclick && "hover:cursor-pointer", "group", rowClassName)}>
-          {row.getVisibleCells().map((cell) => {
-            const column = cell.column;
-            return (
-              <TableCell
-                key={cell.id}
-                data-testid={`data-table-td-${cell.column.id}`}
-                style={{
-                  ...(column.getIsPinned() === "left" && { left: `${column.getStart("left")}px` }),
-                  ...(column.getIsPinned() === "right" && { right: `${column.getStart("right")}px` }),
-                  width: `var(--col-${kebabCase(cell.column.id)}-size)`,
-                }}
-                className={classNames(
-                  "bg-default group-hover:!bg-muted group-data-[state=selected]:bg-subtle flex shrink-0 items-center overflow-hidden",
-                  variant === "compact" && "p-0",
-                  column.getIsPinned() &&
-                    "bg-default group-hover:!bg-muted group-data-[state=selected]:bg-subtle sm:sticky"
-                )}>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </TableCell>
-            );
-          })}
-        </TableRow>
-      ))}
+      {rowsToRender.map(({ row, virtualItem }) => {
+        const customRowClass = typeof rowClassName === "function" ? rowClassName(row) : rowClassName;
+        // TODO: This should be handled in a more abstract way.
+        const isSeparatorRow = (row.original as any).type !== "data";
+
+        return (
+          <TableRow
+            ref={virtualItem ? (node) => rowVirtualizer.measureElement(node) : undefined}
+            key={row.id}
+            data-index={virtualItem?.index} //needed for dynamic row height measurement
+            data-state={row.getIsSelected() && "selected"}
+            data-row-type={isSeparatorRow ? "separator" : "data"}
+            onClick={() => onRowMouseclick && onRowMouseclick(row)}
+            style={{
+              display: "flex",
+              ...(virtualItem && {
+                position: "absolute",
+                transform: `translateY(${virtualItem.start}px)`,
+                width: "100%",
+              }),
+            }}
+            className={classNames(onRowMouseclick && "hover:cursor-pointer", "group", customRowClass)}>
+            {row.getVisibleCells().map((cell) => {
+              const column = cell.column;
+              return (
+                <TableCell
+                  key={cell.id}
+                  data-testid={`data-table-td-${cell.column.id}`}
+                  style={{
+                    ...(column.getIsPinned() === "left" && { left: `${column.getStart("left")}px` }),
+                    ...(column.getIsPinned() === "right" && { right: `${column.getStart("right")}px` }),
+                    width: `var(--col-${kebabCase(cell.column.id)}-size)`,
+                  }}
+                  className={classNames(
+                    isSeparatorRow
+                      ? "!bg-muted flex shrink-0 items-center overflow-hidden"
+                      : "bg-default group-hover:!bg-muted group-data-[state=selected]:bg-subtle flex shrink-0 items-center overflow-hidden",
+                    variant === "compact" && "p-0",
+                    column.getIsPinned() &&
+                      (isSeparatorRow
+                        ? "!bg-muted sm:sticky"
+                        : "bg-default group-hover:!bg-muted group-data-[state=selected]:bg-subtle sm:sticky")
+                  )}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              );
+            })}
+          </TableRow>
+        );
+      })}
     </TableBody>
   );
 }
@@ -344,7 +354,7 @@ const TableHeadLabel = ({ header }: { header: Header<any, any> }) => {
   if (!canSort && !canHide) {
     if (typeof header.column.columnDef.header === "string") {
       return (
-        <div className="truncate px-2 py-1" title={header.column.columnDef.header}>
+        <div className="truncate" title={header.column.columnDef.header}>
           {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
         </div>
       );

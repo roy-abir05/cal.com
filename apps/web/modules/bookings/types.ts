@@ -19,7 +19,8 @@ export type RowData =
       recurringInfo?: RecurringInfo;
     }
   | {
-      type: "today" | "next";
+      type: "separator";
+      label?: string;
     };
 
 export type BookingListingStatus = (typeof validStatuses)[number];

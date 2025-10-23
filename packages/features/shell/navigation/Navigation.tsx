@@ -26,8 +26,35 @@ const getNavigationItems = (orgBranding: OrganizationBranding): NavigationItemTy
     name: "bookings",
     href: "/bookings/upcoming",
     icon: "calendar",
-    badge: <UnconfirmedBookingBadge />,
     isCurrent: ({ pathname }) => pathname?.startsWith("/bookings") ?? false,
+    child: [
+      {
+        name: "upcoming",
+        href: "/bookings/upcoming",
+        isCurrent: ({ pathname }) => pathname === "/bookings/upcoming",
+      },
+      {
+        name: "unconfirmed",
+        href: "/bookings/unconfirmed",
+        badge: <UnconfirmedBookingBadge />,
+        isCurrent: ({ pathname }) => pathname === "/bookings/unconfirmed",
+      },
+      {
+        name: "recurring",
+        href: "/bookings/recurring",
+        isCurrent: ({ pathname }) => pathname === "/bookings/recurring",
+      },
+      {
+        name: "past",
+        href: "/bookings/past",
+        isCurrent: ({ pathname }) => pathname === "/bookings/past",
+      },
+      {
+        name: "cancelled",
+        href: "/bookings/cancelled",
+        isCurrent: ({ pathname }) => pathname === "/bookings/cancelled",
+      },
+    ],
   },
   {
     name: "availability",

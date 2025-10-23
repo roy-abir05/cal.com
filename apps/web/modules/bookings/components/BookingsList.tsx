@@ -1,6 +1,6 @@
 "use client";
 
-import type { Table as ReactTable } from "@tanstack/react-table";
+import type { Row, Table as ReactTable } from "@tanstack/react-table";
 
 import { DataTableWrapper, DataTableFilters, DataTableSegment } from "@calcom/features/data-table";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
@@ -23,9 +23,10 @@ type BookingsListViewProps = {
   table: ReactTable<RowData>;
   isPending: boolean;
   totalRowCount?: number;
+  onRowClick?: (row: Row<RowData>) => void;
 };
 
-export function BookingsList({ status, table, isPending, totalRowCount }: BookingsListViewProps) {
+export function BookingsList({ status, table, isPending, totalRowCount, onRowClick }: BookingsListViewProps) {
   const { t } = useLocale();
 
   return (
@@ -34,11 +35,33 @@ export function BookingsList({ status, table, isPending, totalRowCount }: Bookin
       table={table}
       testId={`${status}-bookings`}
       bodyTestId="bookings"
-      headerClassName="hidden"
       isPending={isPending}
       totalRowCount={totalRowCount}
-      variant="compact"
+      variant="default"
       paginationMode="standard"
+      onRowMouseclick={onRowClick}
+      rowClassName={(row) => {
+        const isSeparatorRow = row.original.type !== "data";
+
+        // Style separator rows to look like table headers
+        if (isSeparatorRow) {
+          // Add border-t for separation, except for the first row (index 0)
+          const isFirstRow = row.index === 0;
+          return isFirstRow ? "!bg-muted" : "!bg-muted border-subtle border-t";
+        }
+
+        // For data rows, check if the next row is a separator row
+        const allRows = table.getRowModel().rows;
+        const nextRow = allRows[row.index + 1];
+        const isNextRowSeparator = nextRow?.original.type !== "data";
+
+        // Remove bottom border from data rows that precede separator rows to avoid double borders
+        if (isNextRowSeparator) {
+          return "!border-b-0";
+        }
+
+        return "";
+      }}
       ToolbarLeft={
         <>
           <DataTableFilters.FilterBar table={table} />
