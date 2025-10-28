@@ -1,9 +1,56 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import prisma from "@calcom/prisma";
 import { MembershipRole } from "@calcom/prisma/enums";
 
 type AccessibleUsersType = {
   memberUserIds: number[];
   adminUserId: number;
+};
+
+const getAllOrganizationMemberships = async (
+  memberships: {
+    userId: number;
+    role: MembershipRole;
+    teamId: number;
+  }[],
+  orgId: number
+) => {
+  return memberships.reduce<number[]>((acc, membership) => {
+    if (membership.teamId === orgId) {
+      acc.push(membership.userId);
+    }
+    return acc;
+  }, []);
+};
+
+const getAllAdminMemberships = async (userId: number) => {
+  return await prisma.membership.findMany({
+    where: {
+      userId: userId,
+      accepted: true,
+      role: { in: [MembershipRole.OWNER, MembershipRole.ADMIN] },
+    },
+    select: {
+      team: {
+        select: {
+          id: true,
+          isOrganization: true,
+        },
+      },
+    },
+  });
+};
+
+const getAllOrganizationMembers = async (organizationId: number) => {
+  return await prisma.membership.findMany({
+    where: {
+      teamId: organizationId,
+      accepted: true,
+    },
+    select: {
+      userId: true,
+    },
+  });
 };
 
 export const getAccessibleUsers = async ({
