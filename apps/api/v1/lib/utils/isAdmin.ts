@@ -15,14 +15,13 @@ export const isAdminGuard = async (req: NextApiRequest) => {
   const orgOwnerOrAdminMemberships = await prisma.membership.findMany({
     where: {
       userId: userId,
-      accepted: true,
       team: {
         isOrganization: true,
         organizationSettings: {
           isAdminAPIEnabled: true,
         },
       },
-      OR: [{ role: MembershipRole.OWNER }, { role: MembershipRole.ADMIN }],
+      role: { in: [MembershipRole.OWNER, MembershipRole.ADMIN] },
     },
     select: {
       team: {
