@@ -579,6 +579,18 @@ Below is a comprehensive list of props that can be passed to the booker atom.
 | showNoAvailabilityDialog     | No       | Boolean indicating if the no availability dialog should be shown, defaults to true.                             |
 | silentlyHandleCalendarFailures     | No       | Boolean when true the booker still displays slots when the third party calendars credentials are invalid or expired, Booker may show stale availability when enabled                             |
 | hideEventMetadata     | No       | Boolean that controls the visibility of the event metadata sidebar. When `true`, hides the left sidebar containing event details like title, description, duration, and host information. Defaults to `false`.                             |
+| teamId                | Conditional | Required when `isTeamEvent` is `true`. The numeric ID of the team whose event is being booked.                             |
+| routingFormSearchParams | No     | Search parameters from routing forms to pass context for advanced routing logic. Format: `"?field1=value1&field2=value2"`.                             |
+| teamMemberEmail       | No       | Email of a specific team member to route the booking to. Used in CRM integrations and team routing.                             |
+| crmAppSlug            | No       | Slug of the CRM app being used (e.g., `"salesforce"`, `"hubspot"`). Used for CRM-based routing.                             |
+| crmOwnerRecordType    | No       | Type of CRM record being referenced (e.g., `"Lead"`, `"Contact"`). Used with CRM integrations.                             |
+| crmRecordId           | No       | Unique identifier of the CRM record. Used to associate bookings with CRM records.                             |
+| preventEventTypeRedirect | No    | Boolean to prevent automatic redirect to event type's success redirect URL. Defaults to `false`.                             |
+| handleCreateBooking   | No       | Custom function to handle booking creation. Overrides the default booking creation logic.                             |
+| onDryRunSuccess       | No       | Callback function triggered when a dry run booking completes successfully.                             |
+| handleSlotReservation | No       | Custom function to handle slot reservation logic. Receives the timeslot string as parameter.                             |
+| entity                | No       | Entity configuration object containing `orgSlug`, `teamSlug`, `name`, and `considerUnpublished` properties.                             |
+| eventMetaChildren     | No       | React node to inject custom content into the event metadata section.                             |
 
 ## Styling
 
