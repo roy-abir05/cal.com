@@ -10,6 +10,7 @@ import { ProfileRepository } from "@calcom/features/profile/repositories/Profile
 import { UserRepository } from "@calcom/features/users/repositories/UserRepository";
 import { getPlaceholderAvatar } from "@calcom/lib/defaultAvatarImage";
 import { getUserAvatarUrl } from "@calcom/lib/getAvatarUrl";
+import { HttpError } from "@calcom/lib/http-error";
 import logger from "@calcom/lib/logger";
 import { markdownToSafeHTML } from "@calcom/lib/markdownToSafeHTML";
 import { safeStringify } from "@calcom/lib/safeStringify";
@@ -17,8 +18,6 @@ import prisma from "@calcom/prisma";
 import { MembershipRole, SchedulingType } from "@calcom/prisma/enums";
 import { teamMetadataSchema } from "@calcom/prisma/zod-utils";
 import { eventTypeMetaDataSchemaWithUntypedApps } from "@calcom/prisma/zod-utils";
-
-import { HttpError } from "@calcom/lib/http-error";
 
 const log = logger.getSubLogger({ prefix: ["viewer.eventTypes.getByViewer"] });
 

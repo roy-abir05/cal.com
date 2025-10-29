@@ -3,10 +3,9 @@ import { templateTypeEnum } from "@calcom/features/calAIPhone";
 import type { TCreatePhoneCallSchema } from "@calcom/features/calAIPhone";
 import { validatePhoneNumber } from "@calcom/features/calAIPhone/retellAIService";
 import { checkRateLimitAndThrowError } from "@calcom/lib/checkRateLimitAndThrowError";
+import { HttpError } from "@calcom/lib/http-error";
 import logger from "@calcom/lib/logger";
 import prisma from "@calcom/prisma";
-
-import { HttpError } from "@calcom/lib/http-error";
 
 export const handleCreatePhoneCall = async ({
   user,
