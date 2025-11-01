@@ -67,7 +67,6 @@ import getOrgIdFromMemberOrTeamId from "@calcom/lib/getOrgIdFromMemberOrTeamId";
 import { getTeamIdFromEventType } from "@calcom/lib/getTeamIdFromEventType";
 import { HttpError } from "@calcom/lib/http-error";
 import logger from "@calcom/lib/logger";
-import { criticalLogger } from "@calcom/lib/logger.server";
 import { getPiiFreeCalendarEvent, getPiiFreeEventType } from "@calcom/lib/piiFreeData";
 import { safeStringify } from "@calcom/lib/safeStringify";
 import { getTranslation } from "@calcom/lib/server/i18n";
@@ -419,6 +418,7 @@ export interface IBookingServiceDependencies {
   luckyUserService: LuckyUserService;
   userRepository: UserRepository;
   hashedLinkService: HashedLinkService;
+  bookingAuditService: import("@calcom/features/booking-audit/lib/service/BookingAuditService").BookingAuditService;
 }
 
 /**
@@ -1727,7 +1727,7 @@ async function handler(
         await usersRepository.updateLastActiveAt(booking.userId);
         const organizerUserAvailability = availableUsers.find((user) => user.id === booking?.userId);
 
-        criticalLogger.info(`Booking created`, {
+        log.info(`Booking created`, {
           bookingUid: booking.uid,
           selectedCalendarIds: organizerUser.allSelectedCalendars?.map((c) => c.id) ?? [],
           availabilitySnapshot: organizerUserAvailability?.availabilityData
@@ -2244,6 +2244,14 @@ async function handler(
       // FIXME: It looks like hasHashedBookingLink is set to true based on the value of hashedLink when sending the request. So, technically we could remove hasHashedBookingLink usage completely
       hashedLink: hasHashedBookingLink ? reqBody.hashedLink ?? null : null,
     },
+    booking: {
+      id: booking.id,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      status: booking.status,
+      userId: booking.userId,
+      user: null,
+    },
   };
 
   // Add more fields here when needed
@@ -2252,6 +2260,7 @@ async function handler(
   const bookingEventHandler = new BookingEventHandlerService({
     log: loggerWithEventDetails,
     hashedLinkService: deps.hashedLinkService,
+    bookingAuditService: deps.bookingAuditService,
   });
 
   // TODO: Incrementally move all stuff that happens after a booking is created to these handlers
