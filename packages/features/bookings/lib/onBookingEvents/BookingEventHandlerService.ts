@@ -1,10 +1,6 @@
 import type { Logger } from "tslog";
 
-import type { HashedLinkService } from "@calcom/features/hashedLink/lib/service/HashedLinkService";
-import { safeStringify } from "@calcom/lib/safeStringify";
 import type { BookingAuditService } from "@calcom/features/booking-audit/lib/service/BookingAuditService";
-import { CreatedAuditActionHelperService } from "@calcom/features/booking-audit/lib/actions/CreatedAuditActionHelperService";
-import type { BookingStatus } from "@calcom/prisma/enums";
 import type {
   StatusChangeAuditData,
   CancelledAuditData,
@@ -21,6 +17,9 @@ import type {
   HostNoShowUpdatedAuditData,
   AttendeeNoShowUpdatedAuditData,
 } from "@calcom/features/booking-audit/lib/types";
+import type { HashedLinkService } from "@calcom/features/hashedLink/lib/service/HashedLinkService";
+import { safeStringify } from "@calcom/lib/safeStringify";
+import type { BookingStatus } from "@calcom/prisma/enums";
 
 import type { Actor } from "../types/actor";
 import { getActorUserId } from "../types/actor";
@@ -51,17 +50,13 @@ export class BookingEventHandlerService {
     await this.onBookingCreatedOrRescheduled(payload);
 
     try {
-      const auditData = CreatedAuditActionHelperService.createData({
+      const auditData = {
         startTime: payload.booking.startTime.toISOString(),
         endTime: payload.booking.endTime.toISOString(),
         status: payload.booking.status,
-      });
+      };
       const userId = payload.booking.userId ?? payload.booking.user?.id ?? undefined;
-      await this.bookingAuditService.onBookingCreated(
-        String(payload.booking.id),
-        userId,
-        auditData
-      );
+      await this.bookingAuditService.onBookingCreated(String(payload.booking.id), userId, auditData);
     } catch (error) {
       this.log.error("Error while creating booking audit", safeStringify(error));
     }
@@ -180,20 +175,20 @@ export class BookingEventHandlerService {
         case "ACCEPTED": {
           // Type guard: ensure data is StatusChangeAuditData or undefined
           const statusData: StatusChangeAuditData | undefined =
-            data && !('rejectionReason' in data) && !('cancellationReason' in data) ? data : undefined;
+            data && !("rejectionReason" in data) && !("cancellationReason" in data) ? data : undefined;
           await this.bookingAuditService.onBookingAccepted(bookingId, getActorUserId(actor), statusData);
           break;
         }
         case "REJECTED": {
           // Caller must provide RejectedAuditData for REJECTED status
-          if (data && 'rejectionReason' in data) {
+          if (data && "rejectionReason" in data) {
             await this.bookingAuditService.onBookingRejected(bookingId, getActorUserId(actor), data);
           }
           break;
         }
         case "CANCELLED": {
           // Caller must provide CancelledAuditData for CANCELLED status
-          if (data && 'cancellationReason' in data) {
+          if (data && "cancellationReason" in data) {
             await this.bookingAuditService.onBookingCancelled(bookingId, getActorUserId(actor), data);
           }
           break;
@@ -201,14 +196,14 @@ export class BookingEventHandlerService {
         case "PENDING": {
           // Type guard: ensure data is StatusChangeAuditData or undefined
           const statusData: StatusChangeAuditData | undefined =
-            data && !('rejectionReason' in data) && !('cancellationReason' in data) ? data : undefined;
+            data && !("rejectionReason" in data) && !("cancellationReason" in data) ? data : undefined;
           await this.bookingAuditService.onBookingPending(bookingId, getActorUserId(actor), statusData);
           break;
         }
         case "AWAITING_HOST": {
           // Type guard: ensure data is StatusChangeAuditData or undefined
           const statusData: StatusChangeAuditData | undefined =
-            data && !('rejectionReason' in data) && !('cancellationReason' in data) ? data : undefined;
+            data && !("rejectionReason" in data) && !("cancellationReason" in data) ? data : undefined;
           await this.bookingAuditService.onBookingAwaitingHost(bookingId, getActorUserId(actor), statusData);
           break;
         }
@@ -229,7 +224,11 @@ export class BookingEventHandlerService {
     }
   }
 
-  async onCancellationReasonUpdated(bookingId: string, actor: Actor, data: CancellationReasonUpdatedAuditData) {
+  async onCancellationReasonUpdated(
+    bookingId: string,
+    actor: Actor,
+    data: CancellationReasonUpdatedAuditData
+  ) {
     try {
       await this.bookingAuditService.onCancellationReasonUpdated(bookingId, getActorUserId(actor), data);
     } catch (error) {
