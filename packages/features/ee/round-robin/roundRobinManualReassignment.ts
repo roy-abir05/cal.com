@@ -1,4 +1,3 @@
- 
 import { cloneDeep } from "lodash";
 
 import { enrichUserWithDelegationCredentialsIncludeServiceAccountKey } from "@calcom/app-store/delegationCredential";
@@ -9,11 +8,14 @@ import {
   sendRoundRobinScheduledEmailsAndSMS,
   sendRoundRobinUpdatedEmailsAndSMS,
 } from "@calcom/emails";
+import type { ReassignmentAuditData } from "@calcom/features/booking-audit/lib/actions/ReassignmentAuditActionService";
+import { getBookingEventHandlerService } from "@calcom/features/bookings/di/BookingEventHandlerService.container";
 import EventManager from "@calcom/features/bookings/lib/EventManager";
 import { getAllCredentialsIncludeServiceAccountKey } from "@calcom/features/bookings/lib/getAllCredentialsForUsersOnEvent/getAllCredentials";
 import getBookingResponsesSchema from "@calcom/features/bookings/lib/getBookingResponsesSchema";
 import { getCalEventResponses } from "@calcom/features/bookings/lib/getCalEventResponses";
 import { getEventTypesFromDB } from "@calcom/features/bookings/lib/handleNewBooking/getEventTypesFromDB";
+import { createUserActor } from "@calcom/features/bookings/lib/types/actor";
 import { getBookerBaseUrl } from "@calcom/features/ee/organizations/lib/getBookerUrlServer";
 import AssignmentReasonRecorder, {
   RRReassignmentType,
@@ -188,6 +190,11 @@ export const roundRobinManualReassignment = async ({
       t: newUserT,
     });
 
+    const oldUserId = booking.userId;
+    const oldUser = booking.user;
+    const oldEmail = booking.user?.email;
+    const _oldTitle = booking.title;
+
     booking = await prisma.booking.update({
       where: { id: bookingId },
       data: {
@@ -200,11 +207,45 @@ export const roundRobinManualReassignment = async ({
           startTime: booking.startTime,
           endTime: booking.endTime,
           userId: newUser.id,
-          reassignedById,
+          reassignedById: reassignedById,
         }),
       },
       select: bookingSelect,
     });
+
+    try {
+      const bookingEventHandlerService = getBookingEventHandlerService();
+      const auditData: ReassignmentAuditData = {
+        reassignmentReason: reassignReason || "Manual round robin reassignment",
+        assignmentMethod: "manual",
+        assignmentDetails: {
+          assignedUser: {
+            id: newUser.id,
+            name: newUser.name || "",
+            email: newUser.email,
+          },
+          previousUser: oldUser
+            ? {
+                id: oldUser.id,
+                name: oldUser.name || "",
+                email: oldEmail || "",
+              }
+            : undefined,
+          teamName: eventType.team?.name,
+        },
+        changes: [
+          { field: "userId", oldValue: oldUserId?.toString() || null, newValue: newUserId.toString() },
+          { field: "email", oldValue: oldEmail || null, newValue: newUser.email },
+        ],
+      };
+      await bookingEventHandlerService.onReassignmentReasonUpdated(
+        String(bookingId),
+        createUserActor(reassignedById),
+        auditData
+      );
+    } catch (error) {
+      logger.error("Failed to create booking audit log for manual round robin reassignment", error);
+    }
 
     await AssignmentReasonRecorder.roundRobinReassignment({
       bookingId,
@@ -312,7 +353,7 @@ export const roundRobinManualReassignment = async ({
     conferenceCredentialId: conferenceCredentialId ?? undefined,
   };
 
-  if( hasOrganizerChanged ){
+  if (hasOrganizerChanged) {
     // location might changed and will be new created in eventManager.create (organizer default location)
     evt.videoCallData = undefined;
     // To prevent "The requested identifier already exists" error while updating event, we need to remove iCalUID
@@ -385,7 +426,7 @@ export const roundRobinManualReassignment = async ({
     bookingMetadata: booking.metadata,
   });
 
-  const { cancellationReason, ...evtWithoutCancellationReason } = evtWithAdditionalInfo;
+  const { cancellationReason: _cancellationReason, ...evtWithoutCancellationReason } = evtWithAdditionalInfo;
 
   // Send emails
   if (emailsEnabled) {

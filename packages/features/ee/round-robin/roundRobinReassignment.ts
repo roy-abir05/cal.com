@@ -1,4 +1,3 @@
- 
 import { cloneDeep } from "lodash";
 
 import {
@@ -13,6 +12,7 @@ import {
   sendRoundRobinScheduledEmailsAndSMS,
   sendRoundRobinUpdatedEmailsAndSMS,
 } from "@calcom/emails";
+import { getBookingEventHandlerService } from "@calcom/features/bookings/di/BookingEventHandlerService.container";
 import EventManager from "@calcom/features/bookings/lib/EventManager";
 import { getAllCredentialsIncludeServiceAccountKey } from "@calcom/features/bookings/lib/getAllCredentialsForUsersOnEvent/getAllCredentials";
 import getBookingResponsesSchema from "@calcom/features/bookings/lib/getBookingResponsesSchema";
@@ -20,6 +20,7 @@ import { getCalEventResponses } from "@calcom/features/bookings/lib/getCalEventR
 import { ensureAvailableUsers } from "@calcom/features/bookings/lib/handleNewBooking/ensureAvailableUsers";
 import { getEventTypesFromDB } from "@calcom/features/bookings/lib/handleNewBooking/getEventTypesFromDB";
 import type { IsFixedAwareUser } from "@calcom/features/bookings/lib/handleNewBooking/types";
+import { createUserActor } from "@calcom/features/bookings/lib/types/actor";
 import { getLuckyUserService } from "@calcom/features/di/containers/LuckyUser";
 import AssignmentReasonRecorder, {
   RRReassignmentType,
@@ -247,6 +248,10 @@ export const roundRobinReassignment = async ({
 
     newBookingTitle = getEventName(eventNameObject);
 
+    const oldUserId = booking.userId;
+    const oldEmail = booking.user?.email || "";
+    const oldTitle = booking.title;
+
     booking = await prisma.booking.update({
       where: {
         id: bookingId,
@@ -259,11 +264,44 @@ export const roundRobinReassignment = async ({
           startTime: booking.startTime,
           endTime: booking.endTime,
           userId: reassignedRRHost.id,
-          reassignedById,
+          reassignedById: reassignedById,
         }),
       },
       select: bookingSelect,
     });
+
+    try {
+      const bookingEventHandlerService = getBookingEventHandlerService();
+      await bookingEventHandlerService.onReassignmentReasonUpdated(
+        String(bookingId),
+        createUserActor(reassignedById),
+        {
+          reassignmentReason: "Round robin reassignment",
+          assignmentMethod: "round_robin",
+          assignmentDetails: {
+            assignedUser: {
+              id: reassignedRRHost.id,
+              name: reassignedRRHost.name || "",
+              email: reassignedRRHost.email,
+            },
+            previousUser: {
+              id: previousRRHost?.id || 0,
+              name: previousRRHost?.name || "",
+              email: previousRRHost?.email || "",
+            },
+            teamId: eventType.teamId ?? undefined,
+            teamName: eventType.team?.name,
+          },
+          changes: [
+            { field: "userId", oldValue: oldUserId, newValue: reassignedRRHost.id },
+            { field: "userPrimaryEmail", oldValue: oldEmail, newValue: reassignedRRHost.email },
+            { field: "title", oldValue: oldTitle, newValue: newBookingTitle },
+          ],
+        }
+      );
+    } catch (error) {
+      logger.error("Failed to create booking audit log for round robin reassignment", error);
+    }
   } else {
     const previousRRHostAttendee = booking.attendees.find(
       (attendee) => attendee.email === previousRRHost.email
@@ -341,12 +379,6 @@ export const roundRobinReassignment = async ({
     ...(platformClientParams ? platformClientParams : {}),
   };
 
-  if(hasOrganizerChanged){
-    // location might changed and will be new created in eventManager.create (organizer default location)
-    evt.videoCallData = undefined;
-    // To prevent "The requested identifier already exists" error while updating event, we need to remove iCalUID
-    evt.iCalUID = undefined;
-  }
   const credentials = await prisma.credential.findMany({
     where: {
       userId: organizer.id,
@@ -416,7 +448,7 @@ export const roundRobinReassignment = async ({
     bookingMetadata: booking.metadata,
   });
 
-  const { cancellationReason, ...evtWithoutCancellationReason } = evtWithAdditionalInfo;
+  const { cancellationReason: _cancellationReason, ...evtWithoutCancellationReason } = evtWithAdditionalInfo;
 
   // Send to new RR host
   if (emailsEnabled) {
